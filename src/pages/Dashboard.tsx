@@ -231,7 +231,15 @@ export default function Dashboard() {
         {/* Activity calendar */}
         <motion.div {...fade(5)} className="min-w-0 lg:col-span-2">
           <Card className="h-full">
-            <SectionTitle>Consistency calendar</SectionTitle>
+            <SectionTitle
+              action={
+                <Link to="/review" className="text-sm font-medium text-brand">
+                  Weekly review →
+                </Link>
+              }
+            >
+              Consistency calendar
+            </SectionTitle>
             {activity && <Heatmap data={activity} today={today} weeks={26} weekStartsOn={settings.weekStartsOn} />}
           </Card>
         </motion.div>

@@ -5,7 +5,7 @@ import type { Habit, HabitColor } from '../db/types'
 import { HABIT_COLORS, HABIT_EMOJIS, HABIT_SUGGESTIONS } from '../lib/colors'
 import { WEEKDAY_SHORT, orderedWeekdays } from '../lib/dates'
 import { useSettings } from '../db/settings'
-import { Button, Field, Input, Modal } from './ui'
+import { Button, Field, Input, Modal, Toggle } from './ui'
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 const WEEKDAYS = [1, 2, 3, 4, 5]
@@ -16,9 +16,11 @@ interface Draft {
   color: HabitColor
   days: number[]
   note: string
+  /** `HH:mm`, or empty for no reminder. */
+  reminder: string
 }
 
-const empty: Draft = { name: '', emoji: '💪', color: 'violet', days: EVERY_DAY, note: '' }
+const empty: Draft = { name: '', emoji: '💪', color: 'violet', days: EVERY_DAY, note: '', reminder: '' }
 
 export function HabitForm({ open, onClose, habit }: { open: boolean; onClose: () => void; habit?: Habit }) {
   const settings = useSettings()
@@ -27,11 +29,19 @@ export function HabitForm({ open, onClose, habit }: { open: boolean; onClose: ()
   const key = open ? (habit?.id ?? 'new') : null
   if (key !== loadedFor) {
     setLoadedFor(key)
-    if (open) setDraft(habit ? { name: habit.name, emoji: habit.emoji, color: habit.color, days: habit.days, note: habit.note ?? '' } : empty)
+    if (open)
+      setDraft(habit ? { name: habit.name, emoji: habit.emoji, color: habit.color, days: habit.days, note: habit.note ?? '', reminder: habit.reminder ?? '' } : empty)
   }
 
   const save = async () => {
-    const payload = { name: draft.name.trim(), emoji: draft.emoji, color: draft.color, days: [...draft.days].sort(), note: draft.note.trim() || undefined }
+    const payload = {
+      name: draft.name.trim(),
+      emoji: draft.emoji,
+      color: draft.color,
+      days: [...draft.days].sort(),
+      note: draft.note.trim() || undefined,
+      reminder: /^\d{2}:\d{2}$/.test(draft.reminder) ? draft.reminder : undefined,
+    }
     if (!payload.name || payload.days.length === 0) return
     if (habit) await updateHabit(habit.id, payload)
     else await createHabit(payload)
@@ -150,6 +160,25 @@ export function HabitForm({ open, onClose, habit }: { open: boolean; onClose: ()
             })}
           </div>
           <p className="mt-1.5 text-xs text-muted">Rest days never break your streak.</p>
+        </div>
+
+        <div className="rounded-2xl bg-surface-2/60 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Daily reminder</div>
+              <div className="text-xs text-muted">A gentle nudge on planned days — only if you haven't checked in yet.</div>
+            </div>
+            <Toggle label="Daily reminder" checked={Boolean(draft.reminder)} onChange={(on) => setDraft({ ...draft, reminder: on ? draft.reminder || '20:00' : '' })} />
+          </div>
+          {draft.reminder && (
+            <input
+              type="time"
+              aria-label="Reminder time"
+              value={draft.reminder}
+              onChange={(e) => setDraft({ ...draft, reminder: e.target.value })}
+              className="mt-3 h-11 rounded-2xl border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-brand"
+            />
+          )}
         </div>
 
         <Field label="Why it matters (optional)">

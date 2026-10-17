@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Onboarding from './pages/Onboarding'
 import { AlarmProvider } from './state/alarms'
 import { DiaryProvider } from './state/diaryLock'
+import { ReminderProvider } from './state/reminders'
 import { SoundProvider } from './state/sound'
 import { TimerProvider } from './state/timers'
 import { ToastProvider } from './state/toast'
@@ -21,6 +22,7 @@ const HabitDetail = lazy(() => import('./pages/HabitDetail'))
 const Habits = lazy(() => import('./pages/Habits'))
 const Mission = lazy(() => import('./pages/Mission'))
 const Reflect = lazy(() => import('./pages/Reflect'))
+const Review = lazy(() => import('./pages/Review'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Timer = lazy(() => import('./pages/Timer'))
 const Workouts = lazy(() => import('./pages/Workouts'))
@@ -44,6 +46,7 @@ function AppRoutes() {
           <Route path="diary" element={<Diary />} />
           <Route path="diary/:date" element={<DiaryEntry />} />
           <Route path="reflect" element={<Reflect />} />
+          <Route path="review" element={<Review />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
@@ -66,11 +69,13 @@ export default function App() {
       <ToastProvider>
         <DiaryProvider>
           <AlarmProvider>
-            <TimerProvider>
-              <SoundProvider>
-                <AppRoutes />
-              </SoundProvider>
-            </TimerProvider>
+            <ReminderProvider>
+              <TimerProvider>
+                <SoundProvider>
+                  <AppRoutes />
+                </SoundProvider>
+              </TimerProvider>
+            </ReminderProvider>
           </AlarmProvider>
         </DiaryProvider>
       </ToastProvider>

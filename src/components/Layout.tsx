@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  BarChart3,
   BookHeart,
   CalendarCheck2,
   Dumbbell,
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/mission', label: "Today's Mission", icon: Target },
   { to: '/habits', label: 'Habits', icon: CalendarCheck2 },
+  { to: '/review', label: 'Weekly Review', icon: BarChart3 },
   { to: '/focus', label: 'Focus Mode', icon: Waves },
   { to: '/timer', label: 'Timers & Alarms', icon: Timer },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },

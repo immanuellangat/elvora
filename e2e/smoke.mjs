@@ -26,6 +26,12 @@ const waitText = async (locator, text, msg) => {
   }
   throw new Error(`${msg}: expected ${text}, got ${await locator.textContent()}`)
 }
+// Current HH:mm, avoiding the last seconds of a minute so the value is still "now" when saved.
+const currentHHMM = async () => {
+  if (new Date().getSeconds() >= 52) await new Promise((r) => setTimeout(r, (61 - new Date().getSeconds()) * 1000))
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)
 }
@@ -94,6 +100,31 @@ await step('persistence after reload', async () => {
   assert(await page.getByRole('button', { name: 'Undo Finish chapter 3' }).isVisible(), 'completed task should stay completed')
 })
 
+await step('skip a habit day without breaking the streak', async () => {
+  await page.goto(`${BASE}/habits`)
+  const card = page.locator('div.rounded-3xl', { hasText: 'Code 30 min' }).first()
+  await card.getByRole('button', { name: 'Skip today' }).click()
+  await card.getByRole('button', { name: 'Skipped', exact: true }).waitFor()
+  await page.goto(`${BASE}/mission`)
+  await page.getByText('Skipped today · rest').waitFor()
+  await page.getByRole('button', { name: 'Undo skip for Code 30 min' }).waitFor()
+})
+
+await step('habit reminder nudges and can be completed', async () => {
+  await page.goto(`${BASE}/habits`)
+  await page.getByRole('button', { name: 'New habit' }).click()
+  await page.getByPlaceholder('e.g. Morning stretch').fill('Drink water')
+  await page.getByRole('switch', { name: 'Daily reminder' }).click()
+  await page.getByLabel('Reminder time').fill(await currentHHMM())
+  await page.getByRole('button', { name: 'Create habit' }).click()
+  const reminder = page.getByRole('status').filter({ hasText: 'Time for Drink water' })
+  await reminder.waitFor({ timeout: 20000 })
+  await shot('04b-reminder')
+  await reminder.getByRole('button', { name: 'Mark Drink water done' }).click()
+  await reminder.waitFor({ state: 'detached' })
+  await page.getByText('Drink water — done').waitFor()
+})
+
 await step('focus timer runs, survives reload, and pauses', async () => {
   await page.goto(`${BASE}/focus`)
   await page.getByLabel('Focus intention').fill('Deep work')
@@ -151,9 +182,7 @@ await step('arrows adjust focus and timer lengths', async () => {
 await step('alarm rings, snoozes and stops', async () => {
   await page.goto(`${BASE}/timer`)
   await page.getByRole('button', { name: 'Set an alarm' }).click()
-  const d = new Date()
-  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  await page.getByLabel('Alarm time').fill(hhmm)
+  await page.getByLabel('Alarm time').fill(await currentHHMM())
   await page.getByPlaceholder(/Wake up/).fill('Study time')
   await page.getByRole('button', { name: 'Set alarm' }).click()
   const dialog = page.getByRole('alertdialog')
@@ -297,6 +326,17 @@ await step('carry forward from earlier days', async () => {
   await page.getByText('Carried forward').waitFor()
 })
 
+await step('weekly review summarises the week', async () => {
+  await page.goto(`${BASE}/review`)
+  await page.getByText('Habit consistency').waitFor()
+  await page.getByRole('table').getByText('Code 30 min').waitFor()
+  await page.getByText('Insights').waitFor()
+  await page.getByText(/strongest day this week/).waitFor()
+  await shot('14b-review')
+  await page.getByRole('button', { name: 'Previous week' }).click()
+  await page.getByRole('button', { name: 'Last week' }).waitFor()
+})
+
 await step('dark mode + mobile layout', async () => {
   await page.goto(BASE)
   await page.getByRole('button', { name: 'Switch to dark mode' }).click()
@@ -313,6 +353,11 @@ await step('dark mode + mobile layout', async () => {
   await page.goto(`${BASE}/mission`)
   await page.waitForTimeout(400)
   await shot('17-mobile-mission')
+  await page.goto(`${BASE}/review`)
+  await page.waitForTimeout(500)
+  const reviewOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  assert(reviewOverflow <= 1, `review page should not scroll sideways on mobile (${reviewOverflow}px)`)
+  await shot('17b-mobile-review')
   await page.getByRole('button', { name: 'More', exact: true }).click()
   await page.waitForTimeout(400)
   await shot('18-mobile-more')
