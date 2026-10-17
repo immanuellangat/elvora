@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   alarmGentleStart: true,
   snoozeMinutes: 9,
   timerAlarm: true,
+  streakGrace: true,
 }
 
 export async function getSettings(): Promise<Settings> {

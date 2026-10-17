@@ -12,6 +12,7 @@ import {
   resetCounter,
   toggleExercise,
   toggleHabit,
+  toggleHabitSkip,
 } from '../db/actions'
 import { exportBackup, importBackup, isBackup } from '../db/backup'
 import { getSettings, updateSettings } from '../db/settings'
@@ -29,6 +30,17 @@ describe('habits & tasks', () => {
     expect(await toggleHabit(id, '2026-10-17')).toBe(true)
     expect(await db.habitLogs.count()).toBe(1)
     expect(await toggleHabit(id, '2026-10-17')).toBe(false)
+    expect(await db.habitLogs.count()).toBe(0)
+  })
+
+  it('skips a day and switches between skipped and done', async () => {
+    const id = await createHabit({ name: 'Run', emoji: '🏃', color: 'teal', days: [0, 1, 2, 3, 4, 5, 6] })
+    expect(await toggleHabitSkip(id, '2026-10-17')).toBe(true)
+    expect((await db.habitLogs.get(`${id}:2026-10-17`))?.kind).toBe('skip')
+    expect(await toggleHabit(id, '2026-10-17')).toBe(true) // skipped → done
+    expect((await db.habitLogs.get(`${id}:2026-10-17`))?.kind).toBeUndefined()
+    expect(await toggleHabitSkip(id, '2026-10-17')).toBe(true) // done → skipped
+    expect(await toggleHabitSkip(id, '2026-10-17')).toBe(false) // skipped → cleared
     expect(await db.habitLogs.count()).toBe(0)
   })
 

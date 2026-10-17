@@ -1,5 +1,5 @@
 import { db, uid } from './db'
-import type { Alarm, Counter, DayKey, Habit, Priority, Session, Task, WorkoutDay, WorkoutLog } from './types'
+import type { Alarm, Counter, DayKey, Habit, HabitDayState, Priority, Session, Task, WorkoutDay, WorkoutLog } from './types'
 import { dayKey, daysBetween, weekdayOf } from '../lib/dates'
 import { defaultPlan } from '../lib/workouts'
 
@@ -23,16 +23,30 @@ export async function deleteHabit(id: string): Promise<void> {
   })
 }
 
-export async function setHabitDone(habitId: string, date: DayKey, done: boolean): Promise<void> {
+export async function setHabitState(habitId: string, date: DayKey, state: HabitDayState): Promise<void> {
   const id = `${habitId}:${date}`
-  if (done) await db.habitLogs.put({ id, habitId, date, createdAt: Date.now() })
-  else await db.habitLogs.delete(id)
+  if (state === null) await db.habitLogs.delete(id)
+  else await db.habitLogs.put({ id, habitId, date, createdAt: Date.now(), ...(state === 'skip' ? { kind: 'skip' as const } : {}) })
 }
 
+export async function setHabitDone(habitId: string, date: DayKey, done: boolean): Promise<void> {
+  await setHabitState(habitId, date, done ? 'done' : null)
+}
+
+/** Done → cleared; skipped or empty → done. Returns whether the day is now done. */
 export async function toggleHabit(habitId: string, date: DayKey): Promise<boolean> {
   const existing = await db.habitLogs.get(`${habitId}:${date}`)
-  await setHabitDone(habitId, date, !existing)
-  return !existing
+  const nowDone = !existing || existing.kind === 'skip'
+  await setHabitState(habitId, date, nowDone ? 'done' : null)
+  return nowDone
+}
+
+/** Skipped → cleared; anything else → skipped. Returns whether the day is now skipped. */
+export async function toggleHabitSkip(habitId: string, date: DayKey): Promise<boolean> {
+  const existing = await db.habitLogs.get(`${habitId}:${date}`)
+  const nowSkipped = existing?.kind !== 'skip'
+  await setHabitState(habitId, date, nowSkipped ? 'skip' : null)
+  return nowSkipped
 }
 
 /* ---------------- Tasks / missions ---------------- */

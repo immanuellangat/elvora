@@ -5,6 +5,7 @@ import { computeStreak, type StreakStats } from '../lib/streaks'
 import { dayKey, shiftDay, weekdayOf } from '../lib/dates'
 import { counterDays } from './actions'
 import type { AchievementStats } from '../lib/achievements'
+import { getSettings } from './settings'
 
 export function useHabits(includeArchived = false): Habit[] | undefined {
   return useLiveQuery(async () => {
@@ -17,18 +18,25 @@ export function useHabitLogs(): HabitLog[] | undefined {
   return useLiveQuery(() => db.habitLogs.toArray(), [])
 }
 
-export function logsByHabit(logs: HabitLog[]): Map<string, Set<DayKey>> {
-  const map = new Map<string, Set<DayKey>>()
+export interface HabitDays {
+  done: Set<DayKey>
+  skipped: Set<DayKey>
+}
+
+export const EMPTY_HABIT_DAYS: HabitDays = { done: new Set(), skipped: new Set() }
+
+export function logsByHabit(logs: HabitLog[]): Map<string, HabitDays> {
+  const map = new Map<string, HabitDays>()
   for (const l of logs) {
-    let set = map.get(l.habitId)
-    if (!set) map.set(l.habitId, (set = new Set()))
-    set.add(l.date)
+    let entry = map.get(l.habitId)
+    if (!entry) map.set(l.habitId, (entry = { done: new Set(), skipped: new Set() }))
+    ;(l.kind === 'skip' ? entry.skipped : entry.done).add(l.date)
   }
   return map
 }
 
-export function habitStreak(h: Habit, dates: Set<DayKey> | undefined, today: DayKey): StreakStats {
-  return computeStreak(h.days, dates ?? [], today, dayKey(h.createdAt))
+export function habitStreak(h: Habit, days: HabitDays | undefined, today: DayKey, grace: boolean): StreakStats {
+  return computeStreak(h.days, days?.done ?? [], today, dayKey(h.createdAt), { skipped: days?.skipped, grace })
 }
 
 export function useTasksOn(date: DayKey): Task[] | undefined {
@@ -79,8 +87,9 @@ export async function loadDaySummary(date: DayKey): Promise<DaySummary> {
     db.workoutLogs.get(date),
     db.sessions.where('date').equals(date).toArray(),
   ])
-  const doneIds = new Set(logs.map((l) => l.habitId))
-  const active = habits.filter((h) => !h.archived)
+  const doneIds = new Set(logs.filter((l) => l.kind !== 'skip').map((l) => l.habitId))
+  const skippedIds = new Set(logs.filter((l) => l.kind === 'skip').map((l) => l.habitId))
+  const active = habits.filter((h) => !h.archived && !skippedIds.has(h.id))
   return {
     date,
     tasks: tasks.filter((t) => !t.dismissed),
@@ -109,7 +118,7 @@ export function useActivity(days: number, today: DayKey): Map<DayKey, number> | 
     ])
     const map = new Map<DayKey, number>()
     const bump = (d: DayKey, n = 1) => map.set(d, (map.get(d) ?? 0) + n)
-    logs.forEach((l) => bump(l.date))
+    logs.filter((l) => l.kind !== 'skip').forEach((l) => bump(l.date))
     tasks.forEach((t) => bump(t.date))
     workouts.forEach((w) => bump(w.date))
     sessions.forEach((s) => bump(s.date))
@@ -128,10 +137,11 @@ export async function loadAchievementStats(today: DayKey): Promise<AchievementSt
     db.counters.toArray(),
   ])
   const byHabit = logsByHabit(logs)
+  const grace = (await getSettings()).streakGrace
   let bestStreak = 0
-  for (const h of habits) bestStreak = Math.max(bestStreak, habitStreak(h, byHabit.get(h.id), today).best)
+  for (const h of habits) bestStreak = Math.max(bestStreak, habitStreak(h, byHabit.get(h.id), today, grace).best)
   return {
-    habitChecks: logs.length,
+    habitChecks: logs.filter((l) => l.kind !== 'skip').length,
     bestStreak,
     focusMinutes: Math.floor(sessions.filter((s) => s.kind === 'focus').reduce((a, s) => a + s.durationSec, 0) / 60),
     workouts: workouts.filter((w) => w.done).length,

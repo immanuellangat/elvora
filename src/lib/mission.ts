@@ -14,12 +14,15 @@ export interface MissionItem {
   refId?: string
   emoji?: string
   detail?: string
+  skipped?: boolean
 }
 
 export interface MissionInput {
   today: DayKey
   habits: Habit[]
   doneHabitIds: Set<string>
+  /** Habits the user chose to skip today (rest) — shown as complete, no guilt. */
+  skippedHabitIds?: Set<string>
   tasks: Task[]
   workoutDay?: WorkoutDay
   workoutLog?: WorkoutLog
@@ -57,7 +60,8 @@ export function buildMission(input: MissionInput): MissionItem[] {
 
   for (const h of input.habits) {
     if (h.archived || !isPlannedOn(h.days, input.today)) continue
-    const done = input.doneHabitIds.has(h.id)
+    const skipped = !input.doneHabitIds.has(h.id) && Boolean(input.skippedHabitIds?.has(h.id))
+    const done = input.doneHabitIds.has(h.id) || skipped
     items.push({
       key: `habit:${h.id}`,
       kind: 'habit',
@@ -66,6 +70,8 @@ export function buildMission(input: MissionInput): MissionItem[] {
       done,
       progress: done ? 1 : 0,
       refId: h.id,
+      detail: skipped ? 'Skipped today · rest' : undefined,
+      skipped,
     })
   }
 

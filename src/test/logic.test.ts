@@ -32,6 +32,34 @@ describe('streaks', () => {
     expect(s.total).toBe(6)
   })
 
+  it('skipped days pause the streak without breaking it or counting', () => {
+    const s = computeStreak(ALL, ['2026-10-13', '2026-10-14', '2026-10-16'], TODAY, '2026-10-01', { skipped: ['2026-10-15'] })
+    expect(s.current).toBe(3)
+    expect(s.total).toBe(3)
+  })
+
+  it('"never miss twice" forgives a single missed day but not two in a row', () => {
+    const done = ['2026-10-12', '2026-10-13', '2026-10-15', '2026-10-16']
+    expect(computeStreak(ALL, done, TODAY, '2026-10-01').current).toBe(2)
+    expect(computeStreak(ALL, done, TODAY, '2026-10-01', { grace: true }).current).toBe(4)
+    expect(computeStreak(ALL, done, TODAY, '2026-10-01', { grace: true }).best).toBe(4)
+    const twoMissed = ['2026-10-12', '2026-10-13', '2026-10-16']
+    expect(computeStreak(ALL, twoMissed, TODAY, '2026-10-01', { grace: true }).current).toBe(1)
+  })
+
+  it('flags a streak at risk when yesterday was missed under grace', () => {
+    const s = computeStreak(ALL, ['2026-10-14', '2026-10-15'], TODAY, '2026-10-01', { grace: true })
+    expect(s.current).toBe(2)
+    expect(s.atRisk).toBe(true)
+    expect(computeStreak(ALL, ['2026-10-14', '2026-10-15', TODAY], TODAY, '2026-10-01', { grace: true }).atRisk).toBe(false)
+    expect(computeStreak(ALL, ['2026-10-15', '2026-10-16'], TODAY, '2026-10-01', { grace: true }).atRisk).toBe(false)
+  })
+
+  it('excludes skipped days from the completion rate', () => {
+    const s = computeStreak(ALL, ['2026-10-16'], TODAY, '2026-10-15', { skipped: ['2026-10-15'] })
+    expect(s.rate30).toBe(1)
+  })
+
   it('computes 30-day completion rate over planned days', () => {
     const s = computeStreak(ALL, ['2026-10-16', '2026-10-15'], TODAY, '2026-10-14')
     // planned: 14, 15, 16 (today not done, so excluded) → 2/3

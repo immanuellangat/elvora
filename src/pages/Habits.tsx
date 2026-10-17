@@ -1,12 +1,12 @@
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
-import { Flame, Plus } from 'lucide-react'
+import { Bell, Flame, Pause, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HabitForm } from '../components/HabitForm'
 import { Button, EmptyState, PageHeader } from '../components/ui'
-import { toggleHabit } from '../db/actions'
-import { habitStreak, logsByHabit, useHabitLogs, useHabits } from '../db/queries'
+import { toggleHabit, toggleHabitSkip } from '../db/actions'
+import { EMPTY_HABIT_DAYS, habitStreak, logsByHabit, useHabitLogs, useHabits, type HabitDays } from '../db/queries'
 import { useSettings } from '../db/settings'
 import type { Habit } from '../db/types'
 import { HABIT_COLORS } from '../lib/colors'
@@ -14,8 +14,12 @@ import { WEEKDAY_LETTER, parseDay, weekOf } from '../lib/dates'
 import { useToday } from '../lib/hooks'
 import { isPlannedOn } from '../lib/streaks'
 
-function HabitCard({ habit, dates, today, week }: { habit: Habit; dates: Set<string>; today: string; week: string[] }) {
-  const stats = habitStreak(habit, dates, today)
+function HabitCard({ habit, days, today, week, grace }: { habit: Habit; days: HabitDays; today: string; week: string[]; grace: boolean }) {
+  const stats = habitStreak(habit, days, today, grace)
+  const dates = days.done
+  const plannedToday = isPlannedOn(habit.days, today)
+  const doneToday = dates.has(today)
+  const skippedToday = days.skipped.has(today)
   const color = HABIT_COLORS[habit.color]
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-line bg-surface p-4 shadow-soft sm:p-5">
@@ -32,13 +36,36 @@ function HabitCard({ habit, dates, today, week }: { habit: Habit; dates: Set<str
               </span>
               <span>Best {stats.best}</span>
               <span>{Math.round(stats.rate30 * 100)}% · 30d</span>
+              {habit.reminder && (
+                <span className="inline-flex items-center gap-0.5">
+                  <Bell size={11} /> {habit.reminder}
+                </span>
+              )}
             </div>
           </div>
         </Link>
+        {plannedToday && !doneToday && (
+          <button
+            onClick={() => void toggleHabitSkip(habit.id, today)}
+            className={clsx(
+              'inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition',
+              skippedToday ? 'bg-surface-2 text-ink' : 'text-faint hover:bg-surface-2 hover:text-muted',
+            )}
+            title="Skip today (sick, travel, rest) — your streak is paused, not broken"
+          >
+            <Pause size={12} /> {skippedToday ? 'Skipped' : 'Skip today'}
+          </button>
+        )}
       </div>
+      {stats.atRisk && !skippedToday && (
+        <p className="mt-3 rounded-xl bg-warn-soft px-3 py-1.5 text-xs text-warn">
+          You missed your last day — check in today and your {stats.current}-day streak carries on.
+        </p>
+      )}
       <div className="mt-4 grid grid-cols-7 gap-1.5">
         {week.map((d) => {
           const done = dates.has(d)
+          const skipped = !done && days.skipped.has(d)
           const future = d > today
           const planned = isPlannedOn(habit.days, d)
           const day = parseDay(d)
@@ -47,7 +74,7 @@ function HabitCard({ habit, dates, today, week }: { habit: Habit; dates: Set<str
               key={d}
               disabled={future}
               onClick={() => void toggleHabit(habit.id, d)}
-              aria-label={`${habit.name} on ${d}: ${done ? 'done' : 'not done'}`}
+              aria-label={`${habit.name} on ${d}: ${done ? 'done' : skipped ? 'skipped' : 'not done'}`}
               aria-pressed={done}
               className="flex flex-col items-center gap-1 disabled:opacity-40"
             >
@@ -56,12 +83,12 @@ function HabitCard({ habit, dates, today, week }: { habit: Habit; dates: Set<str
                 whileTap={{ scale: 0.85 }}
                 className={clsx(
                   'flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold transition-colors',
-                  done ? 'text-white' : planned ? 'bg-surface-2 text-muted hover:bg-line' : 'border border-dashed border-line text-faint',
+                  done ? 'text-white' : skipped ? 'bg-surface-2 text-faint' : planned ? 'bg-surface-2 text-muted hover:bg-line' : 'border border-dashed border-line text-faint',
                   d === today && !done && 'ring-2 ring-brand/40',
                 )}
                 style={done ? { background: color } : undefined}
               >
-                {done ? '✓' : day.getDate()}
+                {done ? '✓' : skipped ? <Pause size={13} /> : day.getDate()}
               </motion.span>
             </button>
           )
@@ -82,7 +109,7 @@ export default function HabitsPage() {
 
   if (!habits || !logs) return null
   const byHabit = logsByHabit(logs)
-  const doneToday = habits.filter((h) => byHabit.get(h.id)?.has(today)).length
+  const doneToday = habits.filter((h) => byHabit.get(h.id)?.done.has(today)).length
 
   return (
     <>
@@ -105,7 +132,7 @@ export default function HabitsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {habits.map((h) => (
-            <HabitCard key={h.id} habit={h} dates={byHabit.get(h.id) ?? new Set()} today={today} week={week} />
+            <HabitCard key={h.id} habit={h} days={byHabit.get(h.id) ?? EMPTY_HABIT_DAYS} today={today} week={week} grace={settings.streakGrace} />
           ))}
         </div>
       )}

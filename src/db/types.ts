@@ -11,6 +11,8 @@ export interface Habit {
   /** Weekdays the habit is planned for (0 = Sunday … 6 = Saturday). */
   days: number[]
   note?: string
+  /** Optional daily reminder time `HH:mm`, on planned days only. */
+  reminder?: string
   createdAt: number
   archived: boolean
   order: number
@@ -21,7 +23,11 @@ export interface HabitLog {
   habitId: string
   date: DayKey
   createdAt: number
+  /** Missing means the habit was done; 'skip' pauses the day (sick, travel, rest). */
+  kind?: 'skip'
 }
+
+export type HabitDayState = 'done' | 'skip' | null
 
 export type Priority = 'high' | 'medium' | 'low'
 
@@ -168,6 +174,8 @@ export interface Settings {
   snoozeMinutes: number
   /** Countdown timers ring until stopped instead of a single chime. */
   timerAlarm: boolean
+  /** "Never miss twice": one missed planned day doesn't break a streak. */
+  streakGrace: boolean
 }
 
 export type AlarmSound = 'chime' | 'rise' | 'birds' | 'beep' | 'digital'

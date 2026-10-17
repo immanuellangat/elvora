@@ -9,7 +9,7 @@ import { MissionRow, useMission } from '../components/mission'
 import { Button, Card, CheckButton, ProgressBar, ProgressRing, SectionTitle } from '../components/ui'
 import { counterDays, toggleHabit } from '../db/actions'
 import { db } from '../db/db'
-import { habitStreak, logsByHabit, useActivity, useAchievementStats, useHabitLogs, useHabits, useReflectedDates, useWorkoutFor } from '../db/queries'
+import { habitStreak, logsByHabit, useActivity, useAchievementStats, useHabitLogs, useHabits, useReflectedDates, useWorkoutFor, type HabitDays } from '../db/queries'
 import { useSettings } from '../db/settings'
 import { evaluateAchievements, nextAchievements } from '../lib/achievements'
 import { HABIT_COLORS } from '../lib/colors'
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const date = parseDay(today)
   const quote = QUOTES[(date.getFullYear() * 400 + date.getMonth() * 31 + date.getDate()) % QUOTES.length]
-  const byHabit = logs ? logsByHabit(logs) : new Map<string, Set<string>>()
+  const byHabit = logs ? logsByHabit(logs) : new Map<string, HabitDays>()
   const todaysHabits = (habits ?? []).filter((h) => isPlannedOn(h.days, today))
   const achievements = stats ? evaluateAchievements(stats) : []
   const earned = achievements.filter((a) => a.earned)
@@ -201,9 +201,10 @@ export default function Dashboard() {
             ) : (
               <ul className="space-y-2">
                 {(habits ?? []).slice(0, 6).map((h) => {
-                  const dates = byHabit.get(h.id)
-                  const s = habitStreak(h, dates, today)
-                  const done = dates?.has(today) ?? false
+                  const days = byHabit.get(h.id)
+                  const s = habitStreak(h, days, today, settings.streakGrace)
+                  const done = days?.done.has(today) ?? false
+                  const skipped = !done && Boolean(days?.skipped.has(today))
                   const planned = todaysHabits.includes(h)
                   return (
                     <li key={h.id} className="flex items-center gap-3">
@@ -212,7 +213,8 @@ export default function Dashboard() {
                         <div className={clsx('truncate text-sm font-medium', !planned && !done && 'text-muted')}>
                           {h.emoji} {h.name}
                         </div>
-                        {!planned && <div className="text-[11px] text-faint">Rest day</div>}
+                        {(!planned || skipped) && <div className="text-[11px] text-faint">{skipped ? 'Skipped today' : 'Rest day'}</div>}
+                        {s.atRisk && !skipped && <div className="text-[11px] text-warn">Check in today to keep your streak</div>}
                       </Link>
                       <span className={clsx('inline-flex items-center gap-1 text-sm font-semibold', s.current > 0 ? 'text-warn' : 'text-faint')}>
                         <Flame size={14} />

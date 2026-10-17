@@ -1,14 +1,14 @@
 import clsx from 'clsx'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Archive, ArchiveRestore, ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, Bell, Pause, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { HabitForm } from '../components/HabitForm'
 import { MonthCalendar } from '../components/MonthCalendar'
-import { Button, Card, Modal, ProgressBar } from '../components/ui'
-import { deleteHabit, toggleHabit, updateHabit } from '../db/actions'
+import { Button, Card, Modal, ProgressBar, Segmented } from '../components/ui'
+import { deleteHabit, toggleHabit, toggleHabitSkip, updateHabit } from '../db/actions'
 import { db } from '../db/db'
-import { habitStreak } from '../db/queries'
+import { habitStreak, logsByHabit, EMPTY_HABIT_DAYS } from '../db/queries'
 import { useSettings } from '../db/settings'
 import { HABIT_COLORS } from '../lib/colors'
 import { WEEKDAY_SHORT, formatDuration } from '../lib/dates'
@@ -21,7 +21,8 @@ const STREAK_BADGES = [3, 7, 14, 21, 30, 66, 100, 200, 365]
 export default function HabitDetail() {
   const { id = '' } = useParams()
   const habit = useLiveQuery(() => db.habits.get(id).then((h) => h ?? null), [id])
-  const dates = useLiveQuery(async () => new Set((await db.habitLogs.where('habitId').equals(id).toArray()).map((l) => l.date)), [id])
+  const logDays = useLiveQuery(async () => logsByHabit(await db.habitLogs.where('habitId').equals(id).toArray()).get(id) ?? EMPTY_HABIT_DAYS, [id])
+  const [tapMode, setTapMode] = useState<'done' | 'skip'>('done')
   const focusSec = useLiveQuery(async () => (await db.sessions.toArray()).filter((s) => s.habitId === id).reduce((a, s) => a + s.durationSec, 0), [id])
   const settings = useSettings()
   const today = useToday()
@@ -30,7 +31,8 @@ export default function HabitDetail() {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  if (habit === undefined || !dates) return null
+  if (habit === undefined || !logDays) return null
+  const dates = logDays.done
   if (habit === null)
     return (
       <div className="py-20 text-center text-muted">
@@ -38,7 +40,7 @@ export default function HabitDetail() {
       </div>
     )
 
-  const stats = habitStreak(habit, dates, today)
+  const stats = habitStreak(habit, logDays, today, settings.streakGrace)
   const color = HABIT_COLORS[habit.color]
   const nextBadge = STREAK_BADGES.find((b) => b > stats.best) ?? stats.best + 100
 
@@ -57,6 +59,11 @@ export default function HabitDetail() {
             {habit.days.length === 7 ? 'Every day' : habit.days.map((d) => WEEKDAY_SHORT[d]).join(' · ')}
             {habit.note && ` — ${habit.note}`}
           </p>
+          {habit.reminder && (
+            <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted">
+              <Bell size={12} /> Reminder at {habit.reminder} on planned days
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(true)}>
@@ -95,21 +102,33 @@ export default function HabitDetail() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm text-muted">Tap a day to mark it as</span>
+            <Segmented
+              value={tapMode}
+              onChange={setTapMode}
+              options={[
+                { value: 'done', label: '✓ Done' },
+                { value: 'skip', label: <span className="inline-flex items-center gap-1"><Pause size={12} /> Skipped</span> },
+              ]}
+            />
+          </div>
           <MonthCalendar
             weekStartsOn={settings.weekStartsOn}
             renderDay={(key, d) => {
               const done = dates.has(key)
+              const skipped = !done && logDays.skipped.has(key)
               const future = key > today
               const planned = isPlannedOn(habit.days, key)
               return (
                 <button
                   disabled={future}
-                  onClick={() => void toggleHabit(habit.id, key)}
-                  aria-label={`${key}: ${done ? 'done' : 'not done'}`}
+                  onClick={() => void (tapMode === 'skip' ? toggleHabitSkip(habit.id, key) : toggleHabit(habit.id, key))}
+                  aria-label={`${key}: ${done ? 'done' : skipped ? 'skipped' : 'not done'}`}
                   aria-pressed={done}
                   className={clsx(
                     'mx-auto flex aspect-square w-full max-w-12 items-center justify-center rounded-xl text-sm font-medium transition',
-                    done ? 'text-white shadow-sm' : planned ? 'bg-surface-2 hover:bg-line' : 'text-faint hover:bg-surface-2',
+                    done ? 'text-white shadow-sm' : skipped ? 'bg-surface-2 text-faint line-through' : planned ? 'bg-surface-2 hover:bg-line' : 'text-faint hover:bg-surface-2',
                     future && 'opacity-30',
                     key === today && !done && 'ring-2 ring-brand/50',
                   )}
@@ -120,7 +139,10 @@ export default function HabitDetail() {
               )
             }}
           />
-          <p className="mt-4 text-xs text-muted">Tap any past day to fix a missed check-in. Dashed days are rest days.</p>
+          <p className="mt-4 text-xs text-muted">
+            Fix a missed check-in anytime. <b>Skipped</b> days (sick, travel, rest) pause your streak instead of breaking it.
+            {settings.streakGrace ? ' “Never miss twice” is on: a single missed day is forgiven.' : ''}
+          </p>
         </Card>
 
         <div className="space-y-4">

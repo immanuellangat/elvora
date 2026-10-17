@@ -1,10 +1,10 @@
 import clsx from 'clsx'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { motion } from 'framer-motion'
-import { ArrowRight, CalendarCheck2, Dumbbell, Flag, Waves } from 'lucide-react'
+import { ArrowRight, CalendarCheck2, Dumbbell, Flag, Pause, Waves } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { toggleHabit, toggleTask } from '../db/actions'
+import { toggleHabit, toggleHabitSkip, toggleTask } from '../db/actions'
 import { db } from '../db/db'
 import { useHabits, useSessionsOn, useTasksOn, useWorkoutFor } from '../db/queries'
 import { useSettings } from '../db/settings'
@@ -24,7 +24,8 @@ export function useMission(date: DayKey) {
   const items = buildMission({
     today: date,
     habits,
-    doneHabitIds: new Set(logs.map((l) => l.habitId)),
+    doneHabitIds: new Set(logs.filter((l) => l.kind !== 'skip').map((l) => l.habitId)),
+    skippedHabitIds: new Set(logs.filter((l) => l.kind === 'skip').map((l) => l.habitId)),
     tasks,
     workoutDay: workout.day,
     workoutLog: workout.log,
@@ -70,7 +71,16 @@ export function MissionRow({ item, date, trailing }: { item: MissionItem; date: 
         item.done && 'bg-surface-2/50',
       )}
     >
-      {linkOnly && !item.done ? (
+      {item.skipped && item.refId ? (
+        <button
+          onClick={() => void toggleHabitSkip(item.refId!, date)}
+          aria-label={`Undo skip for ${item.title}`}
+          title="Skipped today — tap to undo"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted"
+        >
+          <Pause size={13} />
+        </button>
+      ) : linkOnly && !item.done ? (
         <button
           onClick={toggle}
           aria-label={item.kind === 'workout' ? 'Open workout' : 'Start focus'}
@@ -84,7 +94,7 @@ export function MissionRow({ item, date, trailing }: { item: MissionItem; date: 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {item.emoji && <span className="text-base leading-none">{item.emoji}</span>}
-          <span className={clsx('truncate text-sm font-medium', item.done && 'text-muted line-through decoration-faint')}>
+          <span className={clsx('truncate text-sm font-medium', item.done && !item.skipped && 'text-muted line-through decoration-faint', item.skipped && 'text-muted')}>
             {item.title}
           </span>
         </div>

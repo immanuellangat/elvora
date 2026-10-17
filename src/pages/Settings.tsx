@@ -210,6 +210,9 @@ export default function SettingsPage() {
               <span className="text-sm text-muted">min</span>
             </div>
           </Row>
+          <Row title="Never miss twice" hint="Missing one planned day won't break a streak — only two in a row will.">
+            <Toggle label="Never miss twice" checked={s.streakGrace} onChange={(v) => void updateSettings({ streakGrace: v })} />
+          </Row>
           <Row title="Evening reflection prompt" hint="A gentle nudge on the dashboard — never a nag.">
             <Toggle label="Evening reflection prompt" checked={s.reflectionPrompt} onChange={(v) => void updateSettings({ reflectionPrompt: v })} />
           </Row>

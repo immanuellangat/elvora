@@ -1,12 +1,12 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRightCircle, ChevronLeft, ChevronRight, Moon, Pencil, Plus, Trash2, Undo2, Waves } from 'lucide-react'
+import { ArrowRightCircle, ChevronLeft, ChevronRight, Moon, Pause, Pencil, Plus, Trash2, Undo2, Waves } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Menu } from '../components/Menu'
 import { MissionRow, PRIORITY_STYLE, useMission } from '../components/mission'
 import { Button, Card, Field, Input, Modal, PageHeader, ProgressRing, Segmented } from '../components/ui'
-import { addTask, deleteTask, letGoTasks, moveTasks, updateTask } from '../db/actions'
+import { addTask, deleteTask, letGoTasks, moveTasks, toggleHabitSkip, updateTask } from '../db/actions'
 import { usePendingBefore, useReflectedDates } from '../db/queries'
 import { useSettings } from '../db/settings'
 import type { Priority, Task } from '../db/types'
@@ -337,7 +337,27 @@ export default function MissionPage() {
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">Habits</h2>
               <div className="space-y-2">
                 {habitItems.map((item) => (
-                  <MissionRow key={item.key} item={item} date={date} />
+                  <MissionRow
+                    key={item.key}
+                    item={item}
+                    date={date}
+                    trailing={
+                      (!item.done || item.skipped) && (
+                        <Menu
+                          actions={[
+                            {
+                              label: item.skipped ? 'Undo skip' : 'Skip today (rest)',
+                              icon: <Pause size={15} />,
+                              onClick: async () => {
+                                const skipped = await toggleHabitSkip(item.refId!, date)
+                                if (skipped) toast('Skipped — your streak is paused, not broken. Rest well.')
+                              },
+                            },
+                          ]}
+                        />
+                      )
+                    }
+                  />
                 ))}
               </div>
             </section>
