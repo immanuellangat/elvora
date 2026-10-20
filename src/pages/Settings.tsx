@@ -376,7 +376,7 @@ export default function SettingsPage() {
                 } catch {
                   // ignore
                 }
-                window.location.assign('/')
+                window.location.assign(import.meta.env.BASE_URL)
               }}
             >
               Erase everything

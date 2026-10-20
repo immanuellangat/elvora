@@ -4,7 +4,8 @@ import { chromium } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:4173'
+// Works for root and sub-path deployments (e.g. http://localhost:4174/elvora).
+const BASE = (process.env.BASE_URL ?? 'http://localhost:4173').replace(/\/$/, '')
 const SHOTS = process.argv[2] ?? 'e2e/screenshots'
 mkdirSync(SHOTS, { recursive: true })
 
@@ -47,7 +48,7 @@ const today = await (async () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 })()
 
-await page.goto(BASE)
+await page.goto(`${BASE}/`)
 
 await step('onboarding', async () => {
   await page.getByPlaceholder('Your name (optional)').fill('Alex')
@@ -338,7 +339,7 @@ await step('weekly review summarises the week', async () => {
 })
 
 await step('dark mode + mobile layout', async () => {
-  await page.goto(BASE)
+  await page.goto(`${BASE}/`)
   await page.getByRole('button', { name: 'Switch to dark mode' }).click()
   await page.waitForTimeout(400)
   assert(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'dark class applied')
