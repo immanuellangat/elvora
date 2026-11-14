@@ -1,6 +1,20 @@
 # Elvora — Progress with purpose.
 
+[![Deploy to GitHub Pages](https://github.com/immanuellangat/elvora/actions/workflows/deploy.yml/badge.svg)](https://github.com/immanuellangat/elvora/actions/workflows/deploy.yml)
+
 A calm, offline-first companion for building consistency: habits, Today's Mission, focus sessions, workouts, day counters and a private diary with evening reflection.
+
+**[▶ Open the live app](https://immanuellangat.github.io/elvora/)** — nothing to install, no account, and your data never leaves your device.
+
+![Elvora dashboard in dark mode](docs/screenshots/dashboard-dark.png)
+
+| Habits | Focus Mode |
+| --- | --- |
+| ![Habits page with weekly check-ins and streaks](docs/screenshots/habits.png) | ![Full-screen focus timer](docs/screenshots/focus.png) |
+
+| Weekly Review | On a phone |
+| --- | --- |
+| ![Weekly review with consistency, focus time and missions](docs/screenshots/weekly-review.png) | <img src="docs/screenshots/mobile.png" alt="Dashboard on a phone" width="260"> |
 
 ## Run it
 
@@ -63,3 +77,11 @@ npm test                              # unit tests
 npm run build && npm run preview      # then, in another terminal:
 npm run e2e                           # end-to-end test in headless Edge
 ```
+
+The end-to-end test uses Microsoft Edge by default. To run it with another Chromium-based browser (for example on Linux), point `E2E_BROWSER_PATH` at the browser binary:
+
+```bash
+E2E_BROWSER_PATH=/usr/bin/chromium npm run e2e
+```
+
+The screenshots above come from that test: `E2E_SCALE=2 npm run e2e` saves high-resolution captures of every screen to `e2e/screenshots/`.

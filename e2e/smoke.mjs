@@ -37,8 +37,13 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)
 }
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
-const context = await browser.newContext({ viewport: { width: 1360, height: 860 }, colorScheme: 'light' })
+// Microsoft Edge by default; set E2E_BROWSER_PATH to use any Chromium binary (e.g. on Linux or in CI).
+const browser = await chromium.launch(
+  process.env.E2E_BROWSER_PATH ? { executablePath: process.env.E2E_BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true },
+)
+// E2E_SCALE=2 takes high-resolution screenshots (used for the README images).
+const deviceScaleFactor = Number(process.env.E2E_SCALE ?? 1)
+const context = await browser.newContext({ viewport: { width: 1360, height: 860 }, colorScheme: 'light', deviceScaleFactor })
 const page = await context.newPage()
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`))
